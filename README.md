@@ -2,7 +2,7 @@
 
 ![Democritus Grid](Democritus.PNG)
 
-![Architecture Diagram](architecture.png)
+![Architecture Diagram](architecture(2).png)
 
 **Democritus** is a high-performance, fault-tolerant distributed compute engine designed for running massive-scale Monte Carlo simulations. Built with a cloud-native architecture, it leverages a Master-Worker pattern to orchestrate thousands of concurrent physics calculations, visualizing the results in real-time through a 3D "God View" dashboard.
 
@@ -84,4 +84,5 @@ npm run dev
 
 ## 📜 License
 MIT License.
+
 
