@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+:root {
+  --background: #000000;
+  --foreground: #ededed;
+}
+
+body {
+  color: var(--foreground);
+  background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
+  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  /* Prevent scrollbars */
+}
