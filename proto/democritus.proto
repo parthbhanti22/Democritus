@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package democritus;
+
+option go_package = "github.com/parthbhanti22/democritus/proto";
+
+// The DemocritusScheduler service definition.
+service DemocritusScheduler {
+  // RPC 1 RegisterWorker: Worker calls this to tell the server "I am alive".
+  rpc RegisterWorker (WorkerRegistration) returns (RegistrationStatus);
+
+  // RPC 2 GetTask: Worker asks "Do you have work for me?".
+  rpc GetTask (WorkerID) returns (TaskPayload);
+
+  // RPC 3 SubmitResult: Worker gives back the answer.
+  rpc SubmitResult (TaskResult) returns (Ack);
+}
+
+// ---------------- Messages ----------------
+
+// Worker sends this to register
+message WorkerRegistration {
+  string worker_id = 1; // Unique ID (e.g. Hostname or UUID)
+  int32 port = 2;       // Port the worker is listening on (if needed later)
+}
+
+// Server replies with status
+message RegistrationStatus {
+  bool success = 1;
+  string message = 2;
+}
+
+// Worker identifies itself to ask for a task
+message WorkerID {
+  string worker_id = 1;
+}
+
+// The core "Physics" payload
+message TaskPayload {
+  string task_id = 1;            // Unique Task ID
+  int64 seed = 2;                // Seed for reproducible RNG (Science requirement!)
+  int64 iteration_count = 3;     // How many steps in the random walk?
+  string simulation_type = 4;    // e.g., "random_walk_3d"
+}
+
+// The result calculation
+message TaskResult {
+  string task_id = 1;
+  repeated double final_coordinates = 2; // x, y, z (3D support)
+}
+
+// Acknowledgment
+message Ack {
+  bool received = 1;
+}

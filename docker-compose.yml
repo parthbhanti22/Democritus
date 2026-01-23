@@ -1,0 +1,35 @@
+services:
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.scheduler
+    ports:
+      - "50051:50051" # gRPC
+      - "2112:2112" # Metrics
+    networks:
+      - grid
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      - SCHEDULER_URL=scheduler:50051
+    depends_on:
+      - scheduler
+    deploy:
+      replicas: 5
+    networks:
+      - grid
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - grid
+
+networks:
+  grid:

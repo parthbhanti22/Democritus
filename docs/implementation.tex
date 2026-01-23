@@ -1,0 +1,77 @@
+\section{Implementation Details}
+
+\subsection{The Worker Implementation}
+The Worker component is designed using the \textbf{Strategy Pattern}. This ensures loosely coupled architecture where the simulation logic is strictly separated from the communication logic.
+
+\subsubsection{Simulator Interface}
+The \texttt{Simulator} interface defines a contract for all physics models:
+\begin{verbatim}
+type Simulator interface {
+    Run(seed int64, iterations int64) ([]float64, error)
+}
+\end{verbatim}
+This allows us to seamlessly swap the \texttt{RandomWalk3D} implementation for more complex models (e.g., Ising Model or Lattice QCD) without modifying the gRPC client code.
+
+\subsubsection{Random Walk Logic (The Physics)}
+We simulate a particle undergoing Brownian motion in 3D space. The position $P_n$ at step $n$ is given by:
+\[
+P_n = P_{n-1} + \vec{\delta}
+\]
+Where $\vec{\delta}$ is a random vector where each component $\delta_x, \delta_y, \delta_z \in [-0.5, 0.5]$.
+
+To guarantee \textbf{scientific reproducibility}, the Random Number Generator (RNG) is initialized with a specific \texttt{seed} transmitted by the Master.
+\[
+RNG_{state} = f(seed)
+\]
+\[
+RNG_{state} = f(seed)
+\]
+This ensures that re-running Task $T_i$ always yields the exact same coordinate path.
+
+\subsection{The Scheduler Implementation}
+The Scheduler acts as the central coordinator and is responsible for ensuring data integrity and system resilience.
+
+\subsubsection{Concurrency Control (Mutex)}
+Since multiple workers request tasks simultaneously, the internal task queue is a \textbf{Critical Section}. To prevent Race Conditions (e.g., assigning the same task to two workers), we use a \texttt{sync.RWMutex}.
+\begin{itemize}
+    \item \textbf{Lock}: Applied when dequeuing a task or updating its status.
+    \item \textbf{Unlock}: Released immediately after the memory operation to ensure high throughput.
+\end{itemize}
+
+\subsubsection{Fault Tolerance (The Reaper)}
+The system implements a \textbf{Timeout-Based Recovery} mechanism. A background process (The Reaper) wakes up every 10 seconds to scan the state of all running tasks.
+\[
+\text{If } (T_{now} - T_{started}) > 30s \implies \text{Reset to QUEUED}
+\]
+State Diagram:
+\[
+\texttt{QUEUED} \xrightarrow{GetTask} \texttt{RUNNING} \xrightarrow{SubmitResult} \texttt{COMPLETED}
+\]
+\[
+\texttt{RUNNING} \xrightarrow{Timeout} \texttt{QUEUED} \ (\text{Re-entry})
+\]
+\[
+\texttt{RUNNING} \xrightarrow{Timeout} \texttt{QUEUED} \ (\text{Re-entry})
+\]
+This ensures that if a worker crashes or interacts with a "Black Hole" (network partition), the science is not lost.
+
+\section{Deployment \& Observability}
+To satisfy the ``Cloud-Native'' requirement, the system is fully containerized.
+
+\subsection{Containerization}
+We use \textbf{Multi-Stage Docker Builds} to minimize the attack surface and image size.
+\begin{enumerate}
+    \item \textbf{Build Stage}: Uses the \texttt{golang:1.24} image to compile the source code.
+    \item \textbf{Runtime Stage}: Copies only the binary to a ``Distroless'' image (Google's stripped-down Linux). The final image is $<20$MB.
+\end{enumerate}
+
+\subsection{Orchestration}
+\texttt{Docker Compose} manages the cluster lifecycle. It creates a private virtual network where:
+\begin{itemize}
+    \item The \texttt{Scheduler} listens on port 50051.
+    \item 5 \texttt{Workers} automatically discover the scheduler via DNS (\texttt{scheduler:50051}).
+    \item \texttt{Prometheus} scrapes metrics from the scheduler on port 2112.
+\end{itemize}
+
+\subsection{Metrics}
+We expose a Prometheus-compatible \texttt{/metrics} endpoint. The key metric is \texttt{tasks\_completed\_total}, which provides a real-time view of the grid's throughput (Events Per Second).

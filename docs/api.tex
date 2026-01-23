@@ -1,0 +1,20 @@
+\section{API Specification}
+
+The communication layer is built on gRPC/Protobuf. The core service is \texttt{DemocritusScheduler}.
+
+\subsection{Service Definition}
+The \texttt{DemocritusScheduler} service facilitates the coordination between the Master (Scheduler) and the Workers. It exposes three main RPC methods:
+\begin{itemize}
+    \item \texttt{RegisterWorker}: Handshake method for workers to join the grid.
+    \item \texttt{GetTask}: Workers pull work from the scheduler.
+    \item \texttt{SubmitResult}: Workers push the computation results back.
+\end{itemize}
+
+\subsection{TaskPayload Structure}
+The \texttt{TaskPayload} message is critical for scientific reproducibility. It contains:
+\begin{itemize}
+    \item \texttt{task\_id} (string): Unique identifier for the job slice.
+    \item \texttt{seed} (int64): The seed for the Pseudo-Random Number Generator (PRNG). By transmitting this from the master, we ensure that re-running Task X always yields result Y, regardless of which worker computes it.
+    \item \texttt{iteration\_count} (int64): The number of simulation steps (e.g., random walk steps).
+    \item \texttt{simulation\_type} (string): Identifies the physics model, e.g., ``random\_walk\_3d''.
+\end{itemize}
