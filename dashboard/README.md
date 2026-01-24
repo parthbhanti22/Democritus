@@ -13,7 +13,7 @@ A real-time 3D visualization dashboard for the Democritus distributed Monte Carl
 
 ## Tech Stack
 
-- **Framework**: [Next.js 14+](https://nextjs.org/) (App Router)
+- **Framework**: [Next.js](https://nextjs.org/) (App Router)
 - **3D Graphics**: [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) + [Three.js](https://threejs.org/)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
 - **Animation**: [Framer Motion](https://www.framer.com/motion/)
@@ -134,7 +134,7 @@ Edit the `count` prop in `app/page.tsx`:
 ```
 
 ### Changing Particle Color
-Edit the `color` prop in `components/ParticleCloud.tsx`:
+Edit the `color` value on the `PointMaterial` in `components/ParticleCloud.tsx`:
 ```tsx
 <PointMaterial color="#00ff00" />
 ```
