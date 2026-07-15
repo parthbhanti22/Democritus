@@ -1,3 +1,148 @@
 \section{System Design}
-% Architecture diagrams and decisions will go here.
-\textit{To be written...}
+
+This document outlines the architectural decisions and design patterns used in Democritus, a distributed Monte Carlo simulation engine.
+
+\subsection{High-Level Architecture}
+
+Democritus follows the \textbf{Master-Worker} (also known as Master-Slave) distributed computing pattern. This architecture was chosen for its simplicity, scalability, and fault-tolerance properties.
+
+\begin{verbatim}
++-------------------+       gRPC        +-------------------+
+|    SCHEDULER      |<----------------->|     WORKER 1      |
+|    (Master)       |<----------------->|     WORKER 2      |
+|                   |<----------------->|     WORKER N      |
++-------------------+                   +-------------------+
+        |
+        | HTTP /metrics
+        v
++-------------------+       HTTP        +-------------------+
+|   PROMETHEUS      |<------------------|    DASHBOARD      |
+|   (Monitoring)    |                   |    (Next.js)      |
++-------------------+                   +-------------------+
+\end{verbatim}
+
+\subsection{Component Responsibilities}
+
+\subsubsection{Scheduler (The Brain)}
+The Scheduler is the central coordinator responsible for:
+\begin{itemize}
+    \item \textbf{Task Queue Management}: Maintains a queue of 10,000+ simulation tasks.
+    \item \textbf{Task Distribution}: Assigns tasks to workers on-demand (pull-based model).
+    \item \textbf{Result Aggregation}: Collects and stores completed simulation results.
+    \item \textbf{Fault Recovery}: Implements a ``Reaper'' mechanism to reclaim timed-out tasks.
+    \item \textbf{Metrics Export}: Exposes Prometheus-compatible metrics on port 2112.
+\end{itemize}
+
+\subsubsection{Worker (The Muscle)}
+Workers are stateless compute nodes responsible for:
+\begin{itemize}
+    \item \textbf{Task Execution}: Runs the physics simulation (e.g., 3D Random Walk).
+    \item \textbf{Result Submission}: Returns computed coordinates to the Scheduler.
+    \item \textbf{Self-Registration}: Announces presence to the Scheduler on startup.
+\end{itemize}
+
+\subsubsection{Dashboard (The Eyes)}
+A Next.js web application providing:
+\begin{itemize}
+    \item \textbf{Real-time Visualization}: 3D WebGL particle cloud using Three.js.
+    \item \textbf{Metrics Display}: Live task completion counter and worker status.
+\end{itemize}
+
+\subsection{Design Decisions}
+
+\subsubsection{Why gRPC over REST?}
+We chose gRPC with Protocol Buffers for inter-service communication for several reasons:
+\begin{enumerate}
+    \item \textbf{Performance}: Binary serialization is 3-10x faster than JSON.
+    \item \textbf{Strong Typing}: Protobuf schemas provide compile-time type safety.
+    \item \textbf{Streaming Support}: gRPC supports bidirectional streaming (future enhancement).
+    \item \textbf{Code Generation}: Automatic client/server stub generation reduces boilerplate.
+    \item \textbf{Low Latency}: HTTP/2 multiplexing reduces connection overhead.
+\end{enumerate}
+
+\subsubsection{Why Pull-Based Task Distribution?}
+Workers \textit{request} tasks from the Scheduler rather than having tasks \textit{pushed} to them:
+\begin{itemize}
+    \item \textbf{Backpressure}: Workers only request work when ready, preventing overload.
+    \item \textbf{Simplicity}: No need for the Scheduler to track worker availability.
+    \item \textbf{Fault Tolerance}: Dead workers simply stop requesting; no push failures.
+\end{itemize}
+
+\subsubsection{Why Stateless Workers?}
+Workers maintain no persistent state between tasks:
+\begin{itemize}
+    \item \textbf{Horizontal Scaling}: Add/remove workers without coordination.
+    \item \textbf{Failure Recovery}: Crashed workers can be replaced instantly.
+    \item \textbf{Reproducibility}: All state comes from the task payload (including RNG seed).
+\end{itemize}
+
+\subsection{Data Flow}
+
+The lifecycle of a simulation task follows this sequence:
+
+\begin{enumerate}
+    \item \textbf{Initialization}: Scheduler creates 10,000 tasks with unique seeds.
+    \item \textbf{Registration}: Worker calls \texttt{RegisterWorker()} to join the grid.
+    \item \textbf{Task Request}: Worker calls \texttt{GetTask()} to fetch work.
+    \item \textbf{Execution}: Worker runs the simulation using the provided seed.
+    \item \textbf{Submission}: Worker calls \texttt{SubmitResult()} with final coordinates.
+    \item \textbf{Visualization}: Dashboard polls metrics and displays results.
+\end{enumerate}
+
+\[
+\text{Worker} \xrightarrow{\texttt{GetTask()}} \text{Scheduler} \xrightarrow{\texttt{TaskPayload}} \text{Worker} \xrightarrow{\texttt{SubmitResult()}} \text{Scheduler}
+\]
+
+\subsection{Networking Architecture}
+
+All services communicate over a Docker virtual network called \texttt{grid}:
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Service} & \textbf{Port} & \textbf{Protocol} \\
+\hline
+Scheduler (gRPC) & 50051 & HTTP/2 (gRPC) \\
+Scheduler (Metrics) & 2112 & HTTP/1.1 \\
+Prometheus & 9090 & HTTP/1.1 \\
+Dashboard & 3000 & HTTP/1.1 \\
+\hline
+\end{tabular}
+\end{center}
+
+Workers discover the Scheduler via Docker DNS resolution (\texttt{scheduler:50051}).
+
+\subsection{Scalability Considerations}
+
+\subsubsection{Horizontal Scaling}
+The system scales horizontally by adding more workers:
+\begin{verbatim}
+docker compose up --scale worker=50
+\end{verbatim}
+
+\subsubsection{Vertical Scaling}
+Individual workers can utilize multiple CPU cores via Go's goroutine scheduler.
+
+\subsubsection{Bottlenecks}
+The Scheduler is currently a single point of coordination. Future improvements could include:
+\begin{itemize}
+    \item Sharded task queues
+    \item Multiple Scheduler replicas with consensus
+    \item Distributed task storage (Redis, etcd)
+\end{itemize}
+
+\subsection{Security Considerations}
+
+Current implementation prioritizes simplicity over security:
+\begin{itemize}
+    \item \textbf{No Authentication}: Workers are trusted by default.
+    \item \textbf{No Encryption}: gRPC traffic is unencrypted (plaintext).
+    \item \textbf{Internal Network}: All services run on a private Docker network.
+\end{itemize}
+
+For production deployment, consider:
+\begin{itemize}
+    \item mTLS for gRPC connections
+    \item Worker authentication tokens
+    \item Network policies (Kubernetes NetworkPolicy)
+\end{itemize}

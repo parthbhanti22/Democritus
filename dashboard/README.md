@@ -1,36 +1,156 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Democritus Dashboard
+
+A real-time 3D visualization dashboard for the Democritus distributed Monte Carlo simulation engine. Built with Next.js, React Three Fiber, and Tailwind CSS.
+
+![Dashboard Preview](../Democritus.PNG)
+
+## Features
+
+- **3D Particle Cloud**: WebGL-powered visualization using Three.js/React Three Fiber
+- **Real-time Metrics**: Live task completion counter from Prometheus
+- **Auto-rotating Camera**: Orbital controls with smooth animation
+- **Responsive Design**: Works on desktop and mobile browsers
+
+## Tech Stack
+
+- **Framework**: [Next.js](https://nextjs.org/) (App Router)
+- **3D Graphics**: [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) + [Three.js](https://threejs.org/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **Animation**: [Framer Motion](https://www.framer.com/motion/)
+- **Language**: TypeScript
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+ and npm
+- The Democritus backend running (for live metrics)
+
+### Installation
 
 ```bash
+# Navigate to dashboard directory
+cd dashboard
+
+# Install dependencies
+npm install
+
+# Start development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the dashboard.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+dashboard/
+├── app/
+│   ├── layout.tsx        # Root layout with metadata
+│   ├── page.tsx          # Main dashboard page
+│   ├── globals.css       # Global styles
+│   └── api/
+│       └── metrics/
+│           └── route.ts  # Proxy endpoint for Prometheus metrics
+├── components/
+│   └── ParticleCloud.tsx # 3D WebGL particle visualization
+├── lib/
+│   └── api.ts            # API utilities
+└── public/               # Static assets
+```
 
-## Learn More
+## API Endpoint
 
-To learn more about Next.js, take a look at the following resources:
+### `GET /api/metrics`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Proxies metrics from the Democritus Scheduler's Prometheus endpoint.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Response:**
+```json
+{
+  "tasksCompleted": 8910,
+  "activeWorkers": 5
+}
+```
 
-## Deploy on Vercel
+**Notes:**
+- Fetches from `http://localhost:2112/metrics` (Scheduler metrics endpoint)
+- Returns fallback values if the backend is unavailable
+- Parses the `tasks_completed_total` Prometheus metric
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Components
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### ParticleCloud
+
+The main visualization component renders a 3D point cloud representing simulation results.
+
+**Props:**
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `count` | `number` | `10000` | Number of particles to render |
+
+**Features:**
+- Spherical distribution with center clustering
+- Additive blending for glow effect
+- Auto-rotating orbital camera
+- Violet color theme (#8b5cf6)
+
+## Development
+
+```bash
+# Run development server with hot reload
+npm run dev
+
+# Build for production
+npm run build
+
+# Start production server
+npm start
+
+# Run linting
+npm run lint
+```
+
+## Connecting to Backend
+
+The dashboard expects the Democritus backend to be running:
+
+```bash
+# From project root
+docker compose up --build --scale worker=5
+```
+
+This starts:
+- Scheduler on port 50051 (gRPC) and 2112 (metrics)
+- Prometheus on port 9090
+- 5 Worker instances
+
+## Customization
+
+### Changing Particle Count
+Edit the `count` prop in `app/page.tsx`:
+```tsx
+<ParticleCloud count={20000} />
+```
+
+### Changing Particle Color
+Edit the `color` value on the `PointMaterial` in `components/ParticleCloud.tsx`:
+```tsx
+<PointMaterial color="#00ff00" />
+```
+
+## Troubleshooting
+
+### "Failed to fetch metrics"
+- Ensure the Democritus backend is running
+- Check that port 2112 is accessible
+- The dashboard will show fallback values (0 tasks) if backend is down
+
+### Particles not rendering
+- Ensure WebGL is enabled in your browser
+- Try a different browser (Chrome/Firefox recommended)
+- Check browser console for Three.js errors
+
+## License
+
+MIT License - see [LICENSE](../LICENSE) for details.
